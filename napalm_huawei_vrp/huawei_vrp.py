@@ -421,6 +421,9 @@ class VRPDriver(NetworkDriver):
         if retrieve.lower() in ("startup", "all"):
             command = 'display saved-configuration last'
             config["running"] = self.device.send_command(command)
+        # USG returns current datetime as the first line
+        if re.match('^[0-9\-]+\s[0-9:]+\.[0-9]+\s[0-9+:]+', config["running"].split("\n")[0]) is not None:
+            config["running"] = "\n".join(config["running"].split("\n")[1:])
         return config
 
     # ok

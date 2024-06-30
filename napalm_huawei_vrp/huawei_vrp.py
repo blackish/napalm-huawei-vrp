@@ -419,9 +419,8 @@ class VRPDriver(NetworkDriver):
             command = "display current-configuration"
             config["running"] = self.device.send_command(command)
         if retrieve.lower() in ("startup", "all"):
-            # command = 'display saved-configuration last'
-            # config['startup'] = py23_compat.text_type(self.device.send_command(command))
-            pass
+            command = 'display saved-configuration last'
+            config["running"] = self.device.send_command(command)
         return config
 
     # ok
@@ -864,16 +863,63 @@ class VRPDriver(NetworkDriver):
 
     # develop
     def get_lldp_neighbors_detail(self, interface=""):
-        pass
-        """
-        Return a detailed view of the LLDP neighbors as a dictionary.
-
-        Sample output:
-        {
-        }
-        """
-        lldp_neighbors = {}
-        return lldp_neighbors
+        results = {}
+        command = "display lldp neighbor"
+        if interface != "":
+            command = command + f" interface {interface}"
+        output = self.device.send_command(command)
+        iface = None
+        neighbor = None
+        neighbors = []
+        new_iface_re = re.compile("(^.+GE[0-9\/]+)\s+has\s+[0-9]+\s+neighbor\(s\):")
+        new_neighbor_re = re.compile("^Neighbor\sindex\s+:[0-9]+")
+        remote_port_re = re.compile('^Port\sID\s+:(.+)')
+        remote_chassis_id_re = re.compile('^Chassis\sID\s+:([0-9a-f\-]+)')
+        remote_port_description_re = re.compile('^Port\sdescription\s+:(.+)')
+        remote_system_name_re = re.compile('^System\sname\s+:(.+)')
+        remote_system_description_re = re.compile('^System\sdescription\s+:(.+)')
+        for line in output.split('\n'):
+            new_iface = new_iface_re.match(line)
+            if new_iface:
+                if iface:
+                    if neighbor:
+                        neighbors.append(neighbor)
+                    if not neighbors:
+                        neighbors.append({'parent_interface': iface, 'remote_system_capab': [], 'remote_system_enable_capab': [], 'remote_port': 'None', 'remote_chassis_id': 'None', 'remote_port_description': 'None', 'remote_system_name': 'None', 'remote_system_description': 'None'})
+                    results[iface] = neighbors
+                neighbors = []
+                iface = new_iface.group(1)
+                neighbor = None
+                continue
+            new_neighbor = new_neighbor_re.match(line)
+            if new_neighbor:
+                if neighbor:
+                    neighbors.append(neighbor)
+                neighbor = {'parent_interface': iface, 'remote_system_capab': [], 'remote_system_enable_capab': []}
+                continue
+            remote_port = remote_port_re.match(line)
+            if remote_port:
+                neighbor['remote_port'] = remote_port.group(1).strip()
+                continue
+            remote_chassis_id = remote_chassis_id_re.match(line)
+            if remote_chassis_id:
+                neighbor['remote_chassis_id'] = remote_chassis_id.group(1).strip()
+                continue
+            remote_port_description = remote_port_description_re.match(line)
+            if remote_port_description:
+                neighbor['remote_port_description'] = remote_port_description.group(1).strip()
+                continue
+            remote_system_name = remote_system_name_re.match(line)
+            if remote_system_name:
+                neighbor['remote_system_name'] = remote_system_name.group(1).strip()
+                continue
+            remote_system_description = remote_system_description_re.match(line)
+            if remote_system_description:
+                neighbor['remote_system_description'] = remote_system_description.group(1).strip()
+                continue
+        if iface:
+            results[iface] = neighbors
+        return results
 
     # verified
     def get_arp_table(self, vrf=""):

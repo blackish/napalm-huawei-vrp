@@ -874,7 +874,7 @@ class VRPDriver(NetworkDriver):
         iface = None
         neighbor = None
         neighbors = []
-        new_iface_re = re.compile("(^.+GE[0-9\/]+)\s+has\s+[0-9]+\s+neighbor\(s\):")
+        new_iface_re = re.compile("(^.*GE[0-9\/]+|MEth[0\/]+)\s+has\s+[0-9]+\s+neighbor\(s\):")
         new_neighbor_re = re.compile("^Neighbor\sindex\s+:[0-9]+")
         remote_port_re = re.compile('^Port\sID\s+:(.+)')
         remote_chassis_id_re = re.compile('^Chassis\sID\s+:([0-9a-f\-]+)')
@@ -920,6 +920,8 @@ class VRPDriver(NetworkDriver):
             if remote_system_description:
                 neighbor['remote_system_description'] = remote_system_description.group(1).strip()
                 continue
+        if neighbor:
+            neighbors.append(neighbor)
         if iface:
             results[iface] = neighbors
         return results
